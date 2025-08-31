@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EPUB Reader</title>
+    
+    <!-- External CSS -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- External JavaScript libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+</head>
+<body>
+
+<h1>EPUB Reader</h1>
+<p id="demo"></p>
+<button type="button" onclick="doThing()">
+Click me to display Date and Time.</button>
+
+<h2>Import EPUB File</h2>
+<input type="file" id="input" accept=".epub"/>
+<button type="button" id="loadButton">Load EPUB</button>
+
+<!-- Navigation buttons -->
+<div id="navControls" class="hidden">
+    <button onclick="window.reader.navigateToPrevPage()">Previous</button>
+    <button onclick="window.reader.navigateToNextPage()">Next</button>
+    <button onclick="window.reader.readAloud()">Read Aloud</button>
+    <button onclick="window.reader.debugInfo()">Debug</button>
+</div>
+
+<!-- Loading screen and display area -->
+<div id="area">
+    <div id="loadingScreen" class="hidden">
+        <div class="spinner"></div>
+        <div id="progressBar">
+            <div id="progressFill"></div>
+        </div>
+        <div id="statusMessage">Preparing to load...</div>
+    </div>
+</div>
+
+<!-- Load our scripts -->
+<script src="read-the-thing.js"></script>
+<script src="rando.js"></script>
+
+</body>
+</html>
