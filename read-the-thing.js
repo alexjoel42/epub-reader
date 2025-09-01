@@ -102,14 +102,15 @@ window.reader = (function() {
                     // Free chunk memory
                     chunks.length = 0;
                     resolve(totalBuffer.buffer);
-                    return;
-                }
-                
-                const reader = new FileReader();
-                const slice = file.slice(bytesRead, bytesRead + optimalChunkSize);
-                
-                reader.onload = (e) => {
-                    const chunkData = new Uint8Array(e.target.result);
+                    return {
+                        loadEPUB: loadEPUB,
+                        navigateToNextPage: navigateToNextPage,
+                        navigateToPrevPage: navigateToPrevPage,
+                        toggleReadAloud: toggleReadAloud,
+                        stopReadAloud: stopReadAloud,
+                        debugInfo: debugInfo,
+                        populateVoiceList: populateVoiceList
+                    };
                     chunks.push(chunkData);
                     bytesRead += chunkData.length;
                     
@@ -334,7 +335,7 @@ window.reader = (function() {
         console.log("ePub available:", typeof ePub !== 'undefined');
         console.log("Current book:", currentBook);
         console.log("Current rendition:", currentRendition);
-        console.log("Current text length:", window.currentPageText ? window.currentPageText.length : 0);
+        // console.log("Current text length:", window.currentPageText ? window.currentPageText.length : 0);
         console.log("Processing large file:", isProcessingLargeFile);
     }
     

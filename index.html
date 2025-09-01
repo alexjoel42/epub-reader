@@ -1,48 +1,768 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>EPUB Reader</title>
-    
-    <!-- External CSS -->
-    <link rel="stylesheet" href="style.css">
-    
-    <!-- External JavaScript libraries -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPUB Reader with Text-to-Speech</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        header {
+            background: #4a6fa5;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+        
+        .controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .file-controls, .reading-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .reading-controls {
+            justify-content: center;
+        }
+        
+        input[type="file"] {
+            flex: 1;
+            min-width: 250px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        
+        button {
+            padding: 10px 18px;
+            background: #4a6fa5;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            background: #385d8a;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .tts-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .tts-controls select, .tts-controls input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        
+        .reader-container {
+            position: relative;
+            height: 600px;
+            overflow: hidden;
+        }
+        
+        #area {
+            width: 100%;
+            height: 100%;
+            border: 1px solid #e9ecef;
+            background: white;
+        }
+        
+        #loadingScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #4a6fa5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #progressBar {
+            width: 300px;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        
+        #progressFill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a6fa5, #6ba2d6);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        #statusMessage {
+            font-size: 1.1rem;
+            color: #4a6fa5;
+            text-align: center;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .highlight {
+            background-color: #ffeb3b;
+            padding: 2px 0;
+            transition: background-color 0.3s ease;
+        }
+        
+        .current-speech {
+            background-color: #4caf50 !important;
+            color: white !important;
+        }
+        
+        footer {
+            padding: 20px;
+            text-align: center;
+            background: #f8f9fa;
+            color: #6c757d;
+            font-size: 0.9rem;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                border-radius: 0;
+            }
+            
+            .reader-container {
+                height: 500px;
+            }
+            
+            .file-controls, .reading-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
-
-<h1>EPUB Reader</h1>
-<p id="demo"></p>
-<button type="button" onclick="doThing()">
-Click me to display Date and Time.</button>
-
-<h2>Import EPUB File</h2>
-<input type="file" id="input" accept=".epub"/>
-<button type="button" id="loadButton">Load EPUB</button>
-
-<!-- Navigation buttons -->
-<div id="navControls" class="hidden">
-    <button onclick="window.reader.navigateToPrevPage()">Previous</button>
-    <button onclick="window.reader.navigateToNextPage()">Next</button>
-    <button onclick="window.reader.readAloud()">Read Aloud</button>
-    <button onclick="window.reader.debugInfo()">Debug</button>
-</div>
-
-<!-- Loading screen and display area -->
-<div id="area">
-    <div id="loadingScreen" class="hidden">
-        <div class="spinner"></div>
-        <div id="progressBar">
-            <div id="progressFill"></div>
+    <div class="container">
+        <header>
+            <h1>EPUB Reader with Text-to-Speech</h1>
+            <p>Upload an EPUB file to start reading with text highlighting</p>
+        </header>
+        
+        <div class="controls">
+            <div class="file-controls">
+                <input type="file" id="input" accept=".epub"/>
+                <button type="button" id="loadButton">Load EPUB</button>
+            </div>
+            
+            <div class="reading-controls">
+                <button onclick="window.reader.navigateToPrevPage()" id="prevBtn" disabled>Previous</button>
+                <button onclick="window.reader.navigateToNextPage()" id="nextBtn" disabled>Next</button>
+                <button onclick="window.reader.toggleReadAloud()" id="readAloudBtn" disabled>Read Aloud</button>
+                <button onclick="window.reader.stopReadAloud()" id="stopReadBtn" disabled>Stop</button>
+                <button onclick="window.reader.debugInfo()">Debug</button>
+            </div>
+            
+            <div class="tts-controls">
+                <label for="voiceSelect">Voice:</label>
+                <select id="voiceSelect"></select>
+                
+                <label for="rateSelect">Rate:</label>
+                <select id="rateSelect">
+                    <option value="0.5">0.5</option>
+                    <option value="0.75">0.75</option>
+                    <option value="1" selected>1.0</option>
+                    <option value="1.25">1.25</option>
+                    <option value="1.5">1.5</option>
+                </select>
+                
+                <label for="pitchSelect">Pitch:</label>
+                <select id="pitchSelect">
+                    <option value="0.5">0.5</option>
+                    <option value="0.75">0.75</option>
+                    <option value="1" selected>1.0</option>
+                    <option value="1.25">1.25</option>
+                    <option value="1.5">1.5</option>
+                </select>
+            </div>
         </div>
-        <div id="statusMessage">Preparing to load...</div>
+        
+        <div class="reader-container">
+            <div id="area">
+                <div id="loadingScreen" class="hidden">
+                    <div class="spinner"></div>
+                    <div id="progressBar">
+                        <div id="progressFill"></div>
+                    </div>
+                    <div id="statusMessage">Preparing to load...</div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>EPUB Reader with Text-to-Speech & Highlighting | Created with EPUB.js</p>
+        </footer>
     </div>
-</div>
 
-<!-- Load our scripts -->
-<script src="read-the-thing.js"></script>
-<script src="rando.js"></script>
+    <script>
+    // Create a namespace for our reader functions
+    window.reader = (function() {
+        let currentBook = null;
+        let currentRendition = null;
+        let isProcessingLargeFile = false;
+        let speechSynthesis = window.speechSynthesis;
+        let currentUtterance = null;
+        let isReading = false;
+        let speechItems = [];
+        let currentSpeechIndex = 0;
+        let currentHighlightedElement = null;
+        
+        // Check if JSZip is available
+        function checkJSZip() {
+            if (typeof JSZip === 'undefined') {
+                throw new Error('JSZip is not loaded. EPUB files require JSZip to extract content.');
+            }
+            console.log("JSZip available:", typeof JSZip !== 'undefined');
+        }
+        
+        function showLoadingScreen(message, progress) {
+            const loadingScreen = document.getElementById('loadingScreen');
+            const statusMessage = document.getElementById('statusMessage');
+            const progressFill = document.getElementById('progressFill');
+            
+            if (loadingScreen) loadingScreen.classList.remove('hidden');
+            if (statusMessage) statusMessage.textContent = message;
+            if (progressFill) progressFill.style.width = progress + '%';
+        }
+        
+        function hideLoadingScreen() {
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen) {
+                loadingScreen.classList.add('hidden');
+            }
+        }
+        
+        function enableControls() {
+            document.getElementById('prevBtn').disabled = false;
+            document.getElementById('nextBtn').disabled = false;
+            document.getElementById('readAloudBtn').disabled = false;
+        }
+        
+        function disableReadAloudControls() {
+            document.getElementById('stopReadBtn').disabled = true;
+        }
+        
+        function enableReadAloudControls() {
+            document.getElementById('stopReadBtn').disabled = false;
+        }
+        
+        function cleanupPreviousBook() {
+            stopReadAloud();
+            
+            if (currentRendition) {
+                try {
+                    currentRendition.destroy();
+                } catch (e) {
+                    console.warn("Error destroying rendition:", e);
+                }
+                currentRendition = null;
+            }
+            if (currentBook) {
+                try {
+                    if (currentBook.destroy) {
+                        currentBook.destroy();
+                    }
+                } catch (e) {
+                    console.warn("Error destroying book:", e);
+                }
+                currentBook = null;
+            }
+            
+            if (isProcessingLargeFile) {
+                isProcessingLargeFile = false;
+            }
+        }
+        
+        // Optimized EPUB loading with memory management
+        async function loadEPUB(file, targetElementId) {
+            try {
+                console.log("=== STARTING EPUB LOAD ===");
+                const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                console.log(`File size: ${fileSizeMB}MB`);
+                
+                showLoadingScreen("Starting EPUB load...", 5);
+                
+                // Check if JSZip is available
+                checkJSZip();
+                
+                // Clean up previous book with memory cleanup
+                cleanupPreviousBook();
+                
+                // Read file
+                showLoadingScreen("Reading EPUB file...", 20);
+                const arrayBuffer = await readFileAsArrayBuffer(file);
+                console.log("File read successfully:", (arrayBuffer.byteLength / (1024 * 1024)).toFixed(2), "MB");
+                
+                // Load from ArrayBuffer directly
+                showLoadingScreen("Parsing EPUB structure...", 70);
+                currentBook = ePub(arrayBuffer);
+                
+                // Wait for book to be ready with timeout for large files
+                showLoadingScreen("Loading book content...", 85);
+                await Promise.race([
+                    currentBook.ready,
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error("Book loading timeout")), 30000)
+                    )
+                ]);
+                
+                console.log("EPUB ready, rendering...");
+                
+                // Render the book with optimized settings for large files
+                showLoadingScreen("Rendering book...", 95);
+                await renderBook(targetElementId);
+                
+                console.log("Book loading complete");
+                hideLoadingScreen();
+                enableControls();
+                
+                console.log(`EPUB loaded successfully! Size: ${fileSizeMB}MB`);
+                
+            } catch (error) {
+                console.error("EPUB loading failed:", error);
+                showLoadingScreen("Error: " + error.message, 0);
+                setTimeout(() => {
+                    hideLoadingScreen();
+                    alert("Failed to load EPUB: " + error.message);
+                }, 2000);
+            }
+        }
+        
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = e => reject(new Error("File read error: " + e.target.error));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
+        async function renderBook(targetElementId) {
+            try {
+                const targetElement = document.getElementById(targetElementId);
+                
+                // Render the book
+                currentRendition = currentBook.renderTo(targetElement, {
+                    width: "100%",
+                    height: "100%",
+                    spread: "none",
+                    allowScriptedContent: true
+                });
+                
+                // Apply styling
+                currentRendition.themes.register("default", {
+                    "body": {
+                        "font-size": "18px",
+                        "line-height": "1.6",
+                        "font-family": "Georgia, serif",
+                        "color": "#333",
+                        "padding": "20px",
+                        "background": "#fff"
+                    }
+                });
+                currentRendition.themes.select("default");
+                
+                // Display the book with error handling
+                await currentRendition.display();
+                
+                // Set up event listeners
+                setupBookEvents();
+                
+            } catch (error) {
+                console.error("Rendering failed:", error);
+                throw error;
+            }
+        }
+        
+        function setupBookEvents() {
+            if (!currentRendition) return;
+            
+            currentRendition.on('rendered', function(section) {
+                console.log("Section rendered");
+                prepareTextForSpeech();
+            });
+            
+            currentRendition.on('displayError', function(error) {
+                console.error("Display error:", error);
+            });
+        }
+        
+        function prepareTextForSpeech() {
+            try {
+                const iframe = document.querySelector('#area iframe');
+                if (iframe && iframe.contentDocument) {
+                    // Inject highlight CSS if not already present
+                    if (!iframe.contentDocument.getElementById('highlight-style')) {
+                        const style = document.createElement('style');
+                        style.id = 'highlight-style';
+                        style.textContent = '.highlight { background-color: #ffeb3b; padding: 2px 0; transition: background-color 0.3s ease; }';
+                        iframe.contentDocument.head.appendChild(style);
+                    }
+                    const body = iframe.contentDocument.body;
+                    const textNodes = getTextNodes(body);
+                    // Clear previous speech items
+                    speechItems = [];
+                    // Create speech items with text and corresponding elements
+                    textNodes.forEach(node => {
+                        if (node.textContent.trim().length > 0) {
+                            // Wrap text node in a span for highlighting
+                            const span = document.createElement('span');
+                            span.textContent = node.textContent;
+                            span.className = 'text-chunk';
+                            node.parentNode.replaceChild(span, node);
+                            speechItems.push({
+                                text: span.textContent,
+                                element: span
+                            });
+                        }
+                    });
+                    console.log("Prepared", speechItems.length, "text items for speech");
+                }
+            } catch (error) {
+                console.log("Text preparation error:", error);
+            }
+        }
+        
+        function getTextNodes(element) {
+            let textNodes = [];
+            
+            function findTextNodes(node) {
+                if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '') {
+                    textNodes.push(node);
+                } else {
+                    for (let i = 0; i < node.childNodes.length; i++) {
+                        findTextNodes(node.childNodes[i]);
+                    }
+                }
+            }
+            
+            findTextNodes(element);
+            return textNodes;
+        }
+        
+        function navigateToNextPage() {
+            stopReadAloud();
+            if (currentRendition) {
+                try {
+                    currentRendition.next();
+                } catch (error) {
+                    console.error("Next page error:", error);
+                }
+            }
+        }
+        
+        function navigateToPrevPage() {
+            stopReadAloud();
+            if (currentRendition) {
+                try {
+                    currentRendition.prev();
+                } catch (error) {
+                    console.error("Previous page error:", error);
+                }
+            }
+        }
+        
+        function toggleReadAloud() {
+            if (isReading) {
+                pauseReadAloud();
+            } else {
+                startReadAloud();
+            }
+        }
+        
+        function startReadAloud() {
+            if (speechItems.length === 0) {
+                prepareTextForSpeech();
+            }
+            
+            if (speechItems.length === 0) {
+                alert("No text content available to read.");
+                return;
+            }
+            
+            isReading = true;
+            enableReadAloudControls();
+            document.getElementById('readAloudBtn').textContent = 'Pause';
+            
+            // Remove previous highlights
+            removeHighlights();
+            
+            // Start reading from the beginning or where we left off
+            readNextSpeechItem();
+        }
+        
+        function pauseReadAloud() {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+            
+            isReading = false;
+            document.getElementById('readAloudBtn').textContent = 'Read Aloud';
+        }
+        
+        function stopReadAloud() {
+            pauseReadAloud();
+            currentSpeechIndex = 0;
+            removeHighlights();
+            disableReadAloudControls();
+        }
+        
+        function readNextSpeechItem() {
+            if (!isReading || currentSpeechIndex >= speechItems.length) {
+                // Reached the end
+                stopReadAloud();
+                return;
+            }
+            
+            const speechItem = speechItems[currentSpeechIndex];
+            const utterance = new SpeechSynthesisUtterance(speechItem.text);
+            
+            // Set voice and speech properties
+            const voiceSelect = document.getElementById('voiceSelect');
+            const rateSelect = document.getElementById('rateSelect');
+            const pitchSelect = document.getElementById('pitchSelect');
+            
+            if (voiceSelect.selectedIndex >= 0) {
+                utterance.voice = speechSynthesis.getVoices()[voiceSelect.selectedIndex];
+            }
+            
+            utterance.rate = parseFloat(rateSelect.value);
+            utterance.pitch = parseFloat(pitchSelect.value);
+            
+            // Remove previous highlight
+            if (currentHighlightedElement) {
+                currentHighlightedElement.classList.remove('highlight');
+            }
+            
+            // Highlight the text being read
+            highlightElement(speechItem.element);
+            console.log("Reading:", speechItem.text);
+            
+            utterance.onend = function() {
+                if (currentHighlightedElement === speechItem.element) {
+                    currentHighlightedElement.classList.remove('highlight');
+                }
+                currentSpeechIndex++;
+                readNextSpeechItem();
+            };
+            
+            utterance.onerror = function() {
+                console.error("Speech synthesis error");
+                if (currentHighlightedElement === speechItem.element) {
+                    currentHighlightedElement.classList.remove('highlight');
+                }
+                currentSpeechIndex++;
+                readNextSpeechItem();
+            };
+            
+            currentUtterance = utterance;
+            speechSynthesis.speak(utterance);
+        }
+        
+        function highlightElement(element) {
+            element.classList.add('highlight');
+            currentHighlightedElement = element;
+            
+            // Scroll to the element if needed
+            const iframe = document.querySelector('#area iframe');
+            if (iframe && iframe.contentWindow) {
+                const rect = element.getBoundingClientRect();
+                const iframeHeight = iframe.contentWindow.innerHeight;
+                
+                // Only scroll if the element is not in view
+                if (rect.top < 0 || rect.bottom > iframeHeight) {
+                    // Calculate the scroll position to center the element
+                    const scrollTop = iframe.contentDocument.documentElement.scrollTop;
+                    const elementTop = rect.top + scrollTop;
+                    const centerPosition = elementTop - (iframeHeight / 2) + (rect.height / 2);
+                    
+                    iframe.contentDocument.documentElement.scrollTo({
+                        top: centerPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+        }
+        
+        function removeHighlights() {
+            const iframe = document.querySelector('#area iframe');
+            if (iframe && iframe.contentDocument) {
+                const highlighted = iframe.contentDocument.querySelectorAll('.highlight');
+                highlighted.forEach(el => el.classList.remove('highlight'));
+            }
+            currentHighlightedElement = null;
+        }
+        
+        function populateVoiceList() {
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = populateVoiceList;
+            }
+            
+            const voices = speechSynthesis.getVoices();
+            const voiceSelect = document.getElementById('voiceSelect');
+            
+            voiceSelect.innerHTML = '';
+            
+            for (let i = 0; i < voices.length; i++) {
+                const option = document.createElement('option');
+                option.textContent = `${voices[i].name} (${voices[i].lang})`;
+                
+                if (voices[i].default) {
+                    option.textContent += ' — DEFAULT';
+                }
+                
+                option.setAttribute('data-lang', voices[i].lang);
+                option.setAttribute('data-name', voices[i].name);
+                voiceSelect.appendChild(option);
+            }
+        }
+        
+        function debugInfo() {
+            console.log("=== DEBUG INFO ===");
+            console.log("JSZip available:", typeof JSZip !== 'undefined');
+            console.log("ePub available:", typeof ePub !== 'undefined');
+            console.log("Current book:", currentBook);
+            console.log("Current rendition:", currentRendition);
+            console.log("Speech items:", speechItems.length);
+            console.log("Current speech index:", currentSpeechIndex);
+            console.log("Is reading:", isReading);
+        }
+        
+        // Initialize voices
+        populateVoiceList();
+        
+        // Public API
+        return {
+            loadEPUB: loadEPUB,
+            navigateToNextPage: navigateToNextPage,
+            navigateToPrevPage: navigateToPrevPage,
+            toggleReadAloud: toggleReadAloud,
+            stopReadAloud: stopReadAloud,
+            debugInfo: debugInfo,
+            populateVoiceList: populateVoiceList
+        };
+    })();
 
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("Document loaded, setting up event listeners");
+        
+        const loadButton = document.getElementById('loadButton');
+        if (loadButton) {
+            loadButton.addEventListener('click', function() {
+                const fileInput = document.getElementById('input');
+                if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                    alert("Please select an EPUB file first!");
+                    return;
+                }
+
+                const file = fileInput.files[0];
+                console.log("Selected file:", file.name, "Size:", (file.size / 1024 / 1024).toFixed(2) + "MB");
+
+                // Call the reader function
+                if (window.reader && window.reader.loadEPUB) {
+                    window.reader.loadEPUB(file, 'area');
+                } else {
+                    console.error("Reader module not loaded");
+                    alert("Reader functionality not available. Please check the console for errors.");
+                }
+            });
+        }
+        
+        // Populate voices on load
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = window.reader.populateVoiceList;
+        }
+        
+        // Initial population of voices
+        window.reader.populateVoiceList();
+    });
+    </script>
 </body>
 </html>
