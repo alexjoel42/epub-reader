@@ -474,6 +474,7 @@
         }
         
         function prepareTextForSpeech() {
+            // currentSpeechIndex = 0; // Always start at the beginning of the current page
             try {
                 const iframe = document.querySelector('#area iframe');
                 if (iframe && iframe.contentDocument) {
@@ -528,6 +529,7 @@
         
         function navigateToNextPage() {
             stopReadAloud();
+            // currentSpeechIndex = 0; // Reset to start of new page
             if (currentRendition) {
                 try {
                     currentRendition.next();
@@ -536,9 +538,10 @@
                 }
             }
         }
-        
+
         function navigateToPrevPage() {
             stopReadAloud();
+            currentSpeechIndex = 0; // Reset to start of new page
             if (currentRendition) {
                 try {
                     currentRendition.prev();
@@ -560,20 +563,20 @@
             if (speechItems.length === 0) {
                 prepareTextForSpeech();
             }
-            
+
             if (speechItems.length === 0) {
                 alert("No text content available to read.");
                 return;
             }
-            
+
             isReading = true;
             enableReadAloudControls();
             document.getElementById('readAloudBtn').textContent = 'Pause';
-            
+
             // Remove previous highlights
             removeHighlights();
-            
-            // Start reading from the beginning or where we left off
+
+            // Start reading from the last position on this page
             readNextSpeechItem();
         }
         
@@ -588,7 +591,7 @@
         
         function stopReadAloud() {
             pauseReadAloud();
-            currentSpeechIndex = 0;
+            // Do not reset currentSpeechIndex here, so resume works
             removeHighlights();
             disableReadAloudControls();
         }
